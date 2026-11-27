@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Light Show">
+<meta name="theme-color" content="#000000">
+<title>JeanLuc's Light Show</title>
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: tender, calm, a dim nursery at night
+   IDEA: a crib mobile crossed with his star projector, steered from the side
+   PICTURE: the full-screen canvas itself, edge to edge
+   COLOUR & TYPE: true black, white and signal red; Nunito, soft and round
+   LAYOUT: canvas fills the screen; parent controls slide in from the right and hide */
+:root{color-scheme:dark;--st:env(safe-area-inset-top,0px);--sr:env(safe-area-inset-right,0px);--sb:env(safe-area-inset-bottom,0px);--sl:env(safe-area-inset-left,0px)}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;position:fixed;inset:0;overflow:hidden;background:#000;overscroll-behavior:none}
+body{font:16px/1.45 Nunito,system-ui,-apple-system,"Segoe UI",sans-serif;color:#e8e8ec;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+body.idle,body.idle #c{cursor:none}
+button,label{font:inherit;color:inherit;touch-action:manipulation}
+#gear{position:fixed;top:calc(12px + var(--st));right:calc(12px + var(--sr));z-index:6;width:52px;height:52px;padding:0;border-radius:50%;border:0;background:rgba(30,30,34,.55);color:#8a8a92;display:grid;place-items:center;cursor:pointer;opacity:.25;transition:opacity .5s;touch-action:none}
+body.active #gear,#gear.holding{opacity:.95}
+#gear:focus-visible{opacity:1;outline:3px solid #ff2414;outline-offset:2px}
+#gear .ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);pointer-events:none}
+#gear .ring circle{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-dasharray:151;stroke-dashoffset:151}
+#gear.holding .ring circle{stroke-dashoffset:0;transition:stroke-dashoffset .7s linear}
+#panel{position:fixed;top:0;right:0;bottom:0;z-index:7;width:min(390px,100vw);background:rgba(13,13,16,.97);border-left:1px solid #222;transform:translateX(104%);transition:transform .35s ease;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:calc(14px + var(--st)) calc(18px + var(--sr)) calc(36px + var(--sb)) 18px}
+#panel.open{transform:none}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.ph h2{font-size:20px;font-weight:800;margin:0}
+#close{width:44px;height:44px;border-radius:50%;border:1px solid #2b2b33;background:#18181d;font-size:24px;line-height:1;cursor:pointer}
+.sec{margin:20px 0 0}
+.sec h3{font-size:13px;font-weight:700;color:#a3a3ad;margin:0 0 8px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.opt{min-height:44px;padding:9px 12px;border-radius:12px;border:1px solid #2b2b33;background:#18181d;font-weight:700;text-align:left;cursor:pointer}
+.opt small{display:block;font-weight:500;color:#9696a0;font-size:13px;line-height:1.3}
+.opt.on{background:#fff;color:#000;border-color:#fff}
+.opt.on small{color:#4a4a52}
+.opt:disabled{opacity:.4;cursor:default}
+.opt:focus-visible,#close:focus-visible,input:focus-visible,.filebtn:focus-within{outline:3px solid #ff2414;outline-offset:2px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg .opt{flex:1 1 0;text-align:center;padding:9px 6px;white-space:nowrap}
+.sw{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:6px;border:1px solid #3a3a42}
+.sw i{flex:1}
+input[type=range]{width:100%;height:36px;accent-color:#ff2414;margin:0}
+.lab{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:#a3a3ad;margin-top:12px}
+.meter{height:10px;border-radius:5px;background:#24242b;overflow:hidden;margin-top:10px}
+.meter i{display:block;height:100%;width:0;background:#1ee650;border-radius:5px}
+.meter.hit i{background:#ffffff}
+.note{font-size:13px;color:#a3a3ad;margin:8px 0 0}
+.note.warn{color:#ffb9ad}
+.box{margin-top:10px}
+.box[hidden],#camWrap[hidden]{display:none}
+#camWrap{margin-top:10px;display:flex;gap:10px;align-items:center}
+#camPrev{width:128px;height:96px;border-radius:10px;background:#111;flex:none}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row .opt{flex:1 1 0;text-align:center}
+.filebtn{display:block;text-align:center;cursor:pointer;position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;font-size:16px}
+.tips{margin:0;padding-left:18px;font-size:14px;color:#b9b9c2;display:grid;gap:6px}
+.tips b{color:#fff}
+.keys{font-size:13px;color:#8d8d97;line-height:1.9;margin:0}
+kbd{font:inherit;font-weight:700;color:#e0e0e6;background:#25252c;border-radius:5px;padding:1px 6px}
+@media (hover:none){.keysec{display:none}}
+#cam,#song{position:fixed;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none}
+#start{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:rgba(0,0,0,.6);overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:calc(24px + var(--st)) calc(20px + var(--sr)) calc(24px + var(--sb)) calc(20px + var(--sl));transition:opacity .7s}
+#start.gone{opacity:0;pointer-events:none}
+.card{max-width:600px;text-align:center}
+.card h1{font-size:clamp(34px,6vw,52px);line-height:1.05;margin:0 0 10px;font-weight:800;color:#fff;text-wrap:balance}
+.lead{font-size:18px;color:#d8d8de;margin:0 0 22px}
+.list{list-style:none;padding:0;margin:0 0 26px;text-align:left;display:grid;gap:10px}
+.list li{background:rgba(255,255,255,.08);border-radius:14px;padding:12px 16px;color:#e6e6ea}
+.list b{color:#fff}
+.big{font-weight:800;font-size:20px;min-height:58px;padding:0 38px;border-radius:999px;border:0;background:#fff;color:#000;cursor:pointer}
+.big:focus-visible{outline:3px solid #ff2414;outline-offset:3px}
+.fine{font-size:14px;color:#9a9aa4;margin:16px 0 0}
+#rest{position:fixed;inset:0;z-index:8;display:grid;place-items:center;padding:24px;opacity:0;pointer-events:none;transition:opacity 2.5s}
+#rest.show{opacity:1;pointer-events:auto}
+#rest h2{font-size:34px;font-weight:800;margin:0 0 8px;color:#d6d6dc}
+#rest p{color:#a9a9b2;margin:0 0 22px;font-size:17px}
+#rest .big{background:#2a2a31;color:#e8e8ec}
+#toast{position:fixed;left:50%;bottom:calc(22px + var(--sb));z-index:9;transform:translateX(-50%);background:rgba(18,18,22,.92);color:#cfcfd6;padding:10px 16px;border-radius:12px;font-size:14px;width:max-content;max-width:min(92vw,540px);text-align:center;opacity:0;transition:opacity .4s;pointer-events:none}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Moving high-contrast light show"></canvas>
+<video id="cam" muted playsinline autoplay></video>
+<audio id="song" playsinline preload="auto"></audio>
+
+<button id="gear" aria-label="Controls: hold to open" title="Controls (H)">
+  <svg class="ring" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24"/></svg>
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h11M21 18h-1"/><circle cx="16" cy="6" r="2.4"/><circle cx="10" cy="12" r="2.4"/><circle cx="18" cy="18" r="2.4"/></svg>
+</button>
+
+<aside id="panel" aria-label="Controls">
+  <div class="ph"><h2>Light show controls</h2><button id="close" aria-label="Close controls">&times;</button></div>
+
+  <div class="sec"><h3>Scene</h3><div id="scenes" class="grid2"></div></div>
+  <div class="sec"><h3>Colors</h3><div id="pals" class="grid2"></div></div>
+  <div class="sec"><h3>How many things</h3><div id="dens" class="seg"></div></div>
+  <div class="sec"><h3>Speed</h3><div id="speed" class="seg"></div></div>
+  <div class="sec"><h3>Brightness</h3><input id="bright" type="range" min="25" max="100" step="1" aria-label="Brightness"></div>
+
+  <div class="sec">
+    <h3>Music the show dances to</h3>
+    <div id="music" class="seg"></div>
+    <div id="songBox" class="box" hidden>
+      <label class="opt filebtn">Choose songs&hellip;<input id="songIn" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav" multiple aria-label="Choose songs"></label>
+      <div class="row" style="margin-top:8px"><button class="opt" id="songPlay">Play</button><button class="opt" id="songNext">Next</button></div>
+      <p class="note" id="songNow"></p>
+    </div>
+    <div id="musBox" class="box" hidden>
+      <div class="lab"><span>How much it dances</span></div>
+      <div id="react" class="seg" style="margin-top:6px"></div>
+      <div class="meter" id="musMeter"><i></i></div>
+    </div>
+    <p class="note" id="musNote"></p>
+  </div>
+
+  <div class="sec">
+    <h3>Respond to him</h3>
+    <div id="sensor" class="seg"></div>
+    <div id="senBox" class="box" hidden>
+      <div class="lab"><span>Sensitivity</span><span id="senCount"></span></div>
+      <input id="sens" type="range" min="0" max="100" step="1" aria-label="Sensitivity">
+      <div class="meter" id="meter"><i></i></div>
+      <div id="camWrap" hidden><canvas id="camPrev" width="128" height="96"></canvas><p class="note" style="margin:0">Aim the front camera at his arms and legs. The green bar should stay low when he's still.</p></div>
+    </div>
+    <p class="note" id="senNote"></p>
+  </div>
+
+  <div class="sec"><h3>When he touches the screen</h3>
+    <div class="lab" style="margin-top:0"><span>Soft chime</span></div>
+    <div id="chimes" class="seg" style="margin-top:6px"></div>
+    <div id="buzzSec" hidden><div class="lab"><span>Buzz</span></div><div id="buzz" class="seg" style="margin-top:6px"></div></div>
+    <p class="note" id="noBuzz" hidden>iPads have no vibration motor, so touches answer with a bloom of light and a chime instead.</p>
+  </div>
+
+  <div class="sec"><h3>Volume</h3><input id="vol" type="range" min="0" max="100" step="1" aria-label="Volume"></div>
+  <div class="sec"><h3>Change scene by itself</h3><div id="auto" class="seg"></div></div>
+
+  <div class="sec"><h3>Rest after</h3><div id="session" class="seg"></div>
+    <p class="note"><span id="elapsed">0:00</span> watched &middot; <a href="#" id="resetT" style="color:#e8e8ec">restart timer</a></p>
+  </div>
+
+  <div class="sec row">
+    <button class="opt" id="fsBtn">Full screen</button>
+    <button class="opt" id="pauseBtn">Pause</button>
+  </div>
+
+  <div class="sec"><h3>On iPad</h3>
+    <ul class="tips">
+      <li><b>Mic and camera</b> need the app opened from its own web address in Safari. Inside the Claude app they're blocked.</li>
+      <li><b>Lock him in:</b> Settings &rsaquo; Accessibility &rsaquo; Guided Access. Triple-click the top button to start it, so swipes can't leave the app.</li>
+      <li><b>Music from other apps</b> can't reach a web page. Use My songs (files in the Files app) or play from another device with Listen.</li>
+      <li><b>Tummy time:</b> stand the iPad low in front of him. Faces and Mirror work well.</li>
+    </ul>
+  </div>
+
+  <div class="sec keysec"><h3>Keys</h3>
+    <p class="keys"><kbd>Space</kbd> respond &nbsp; <kbd>&larr;</kbd><kbd>&rarr;</kbd> or <kbd>1</kbd>&ndash;<kbd>9</kbd> scene &nbsp; <kbd>C</kbd> colors &nbsp; <kbd>D</kbd> how many &nbsp; <kbd>S</kbd> speed &nbsp; <kbd>M</kbd> play/pause songs &nbsp; <kbd>P</kbd> pause &nbsp; <kbd>F</kbd> full screen &nbsp; <kbd>H</kbd> controls</p>
+  </div>
+</aside>
+
+<div id="start">
+  <div class="card">
+    <h1>JeanLuc's Light Show</h1>
+    <p class="lead">Slow, bold, high-contrast motion made for a two-month-old.</p>
+    <ul class="list">
+      <li><b>Dim the room</b> and keep him 1&ndash;3 feet from the screen. The shapes are big on purpose.</li>
+      <li><b>Short and together.</b> The screen rests itself after 5 minutes. Turning away, fussing, hiccups or yawns mean he's had enough.</li>
+      <li><b>Answer him.</b> Tap the screen when he coos or smiles. Every touch makes a bloom right where the finger lands.</li>
+      <li><b>Controls:</b> press and hold the round button in the corner. A quick baby swat won't open it.</li>
+    </ul>
+    <button class="big" id="go">Start the show</button>
+    <p class="fine">Everything stays on this device. Camera and microphone are only used when you turn them on.</p>
+  </div>
+</div>
+
+<div id="rest" aria-live="polite">
+  <div class="card">
+    <h2>Rest time</h2>
+    <p id="restMsg">Little eyes tire fast. Try again after a cuddle.</p>
+    <button class="big" id="more">Keep going</button>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+(()=>{
+'use strict';
+const TAU=Math.PI*2;
+const $=s=>document.querySelector(s);
+const rand=(a,b)=>a+Math.random()*(b-a);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const cv=$('#c'), ctx=cv.getContext('2d');
+let W=1,H=1,M=1;
+
+/* ---------- palettes ---------- */
+const PALS=[
+  {name:'Black & white', bg:'#000000', c:['#ffffff'], dark:true},
+  {name:'White & black', bg:'#ffffff', c:['#000000'], dark:false},
+  {name:'Red pop', bg:'#000000', c:['#ff2414','#ffffff'], dark:true},
+  {name:'Classic red', bg:'#ffffff', c:['#000000','#e3120b'], dark:false},
+  {name:'Red & green', bg:'#000000', c:['#ff2a14','#1ee650'], dark:true},
+  {name:'Borealis', bg:'#000000', c:['#2dff8f','#ff3de8','#22d6ff','#ffffff'], dark:true},
+  {name:'Rainbow (3 mo+)', bg:'#000000', c:['#ff2a14','#ffe014','#2a6bff','#ffffff'], dark:true}
+];
+const SCN=[['Aurora','Flowing ribbons'],['Bullseye','Rings that ripple'],['Shapes','Stars, hearts, flowers'],['Faces','Smile and blink'],['Waves','Rolling stripes'],['Pinwheel','Slow checker spin'],['Lava','Merging blobs'],['Tracker','A ball to follow'],['Mirror','His own face, bold (camera)']];
+const MIRROR=8;
+
+/* ---------- settings ---------- */
+const KEY='jeanluc-lightshow-v1';
+const DEF={scene:0,pal:0,dens:1,speed:1,bright:1,auto:0,chimes:1,buzz:1,music:0,react:1,vol:.5,sens:.5,session:5};
+const S={...DEF,sensor:0};
+try{
+  const o=JSON.parse(localStorage.getItem(KEY)||'null');
+  if(o){
+    for(const k in DEF) if(typeof o[k]===typeof DEF[k]) S[k]=o[k];
+    if(typeof o.sound==='number'&&o.chimes===undefined){S.chimes=o.sound>0?1:0; S.music=o.sound===2?1:0;}
+  }
+}catch(e){}
+S.scene=clamp(S.scene|0,0,SCN.length-1); if(S.scene===MIRROR) S.scene=3;
+S.pal=clamp(S.pal|0,0,PALS.length-1); S.dens=clamp(S.dens|0,0,2); S.speed=clamp(S.speed|0,0,2); S.react=clamp(S.react|0,0,2);
+S.bright=clamp(+S.bright||1,.25,1); S.vol=clamp(+S.vol,0,1); S.sens=clamp(+S.sens,0,1);
+if(![0,45,120].includes(S.auto)) S.auto=0; if(![0,1].includes(S.chimes)) S.chimes=1; if(![0,1].includes(S.buzz)) S.buzz=1;
+if(![0,1,2].includes(S.music)) S.music=0; if(![3,5,10,0].includes(S.session)) S.session=5;
+const save=()=>{try{const o={}; for(const k in DEF) o[k]=S[k]; if(o.music===3) o.music=0; localStorage.setItem(KEY,JSON.stringify(o));}catch(e){}};
+
+const P=()=>PALS[S.pal]||PALS[0];
+function col(i){const c=P().c; i=Math.floor(i); return c[((i%c.length)+c.length)%c.length];}
+function band(i){i=Math.floor(i); return (i&1)?col((i-1)/2):P().bg;}
+function fgMain(){const p=P(), w=p.dark?'#ffffff':'#000000'; return p.c.includes(w)?w:p.c[0];}
+function fgAccent(){const p=P(), m=fgMain(); return p.c.find(c=>c!==m)||null;}
+const HX={}; const hex=h=>HX[h]||(HX[h]=[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]);
+
+/* ---------- shared state ---------- */
+let energy=0, energyT=0, spd=1, T=0, running=false, paused=false, resting=false;
+const ptr={x:0,y:0,down:false,moved:-1e9};
+function disc(x,y,r){ctx.beginPath(); ctx.arc(x,y,Math.max(0,r),0,TAU); ctx.fill();}
+function bgFill(){ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over'; ctx.fillStyle=P().bg; ctx.fillRect(0,0,W,H);}
+function roundedPoly(pts,rad){const n=pts.length, mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2]; const m=mid(pts[n-1],pts[0]); ctx.moveTo(m[0],m[1]); for(let i=0;i<n;i++){const p=pts[i], q=pts[(i+1)%n], mm=mid(p,q); ctx.arcTo(p[0],p[1],mm[0],mm[1],rad);} ctx.closePath();}
+function shapePath(type,r){
+  ctx.beginPath();
+  if(type===0){ctx.arc(0,0,r,0,TAU);}
+  else if(type===1){for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5, rr=(i&1)?r*.5:r; const x=Math.cos(a)*rr, y=Math.sin(a)*rr; i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.closePath();}
+  else if(type===2){ctx.moveTo(0,r*.92); ctx.bezierCurveTo(-r*.35,r*.62,-r*1.05,r*.2,-r*1.0,-r*.3); ctx.bezierCurveTo(-r*.95,-r*.88,-r*.22,-r*1.0,0,-r*.48); ctx.bezierCurveTo(r*.22,-r*1.0,r*.95,-r*.88,r*1.0,-r*.3); ctx.bezierCurveTo(r*1.05,r*.2,r*.35,r*.62,0,r*.92); ctx.closePath();}
+  else if(type===3){const s=r*.84; roundedPoly([[-s,-s],[s,-s],[s,s],[-s,s]],r*.26);}
+  else if(type===4){for(let i=0;i<6;i++){const a=i*TAU/6, x=Math.cos(a)*r*.52, y=Math.sin(a)*r*.52; ctx.moveTo(x+r*.46,y); ctx.arc(x,y,r*.46,0,TAU);} ctx.moveTo(r*.5,0); ctx.arc(0,0,r*.5,0,TAU);}
+  else {const pts=[0,1,2].map(i=>{const a=-Math.PI/2+i*TAU/3; return [Math.cos(a)*r*1.08,Math.sin(a)*r*1.08+r*.14];}); roundedPoly(pts,r*.2);}
+}
+
+/* ---------- camera, shared by Mirror and Movement ---------- */
+const cam={stream:null,users:new Set(),vid:$('#cam'),pending:null,err:null};
+function inFrame(){try{return window.self!==window.top;}catch(e){return true;}}
+function mediaMsg(e,what){
+  if(inFrame()) return `The Claude viewer can't use the ${what}. Open the app from its own web address in Safari to use this. Tapping still works here.`;
+  if(!window.isSecureContext||!navigator.mediaDevices) return `The ${what} only works when the app is opened from an https:// address.`;
+  if(e&&(e.name==='NotAllowedError'||e.name==='SecurityError')) return `The ${what} was blocked. Allow it in the browser's settings for this site (on iPad: tap aA in the address bar, then Website Settings), then try again.`;
+  if(e&&e.name==='NotFoundError') return `No ${what} found on this device.`;
+  return `The ${what} didn't start. Close other apps using it and try again.`;
+}
+async function camAcquire(who){
+  cam.users.add(who);
+  if(cam.stream) return true;
+  if(!cam.pending) cam.pending=(async()=>{
+    try{
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw {name:'NoMedia'};
+      const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});
+      if(!cam.users.size){st.getTracks().forEach(t=>t.stop()); return false;}
+      cam.stream=st; cam.err=null; cam.vid.srcObject=st; try{await cam.vid.play();}catch(e){}
+      return true;
+    }catch(e){cam.err=e; return false;}
+    finally{cam.pending=null;}
+  })();
+  const ok=await cam.pending; if(!ok) cam.users.delete(who); return ok;
+}
+function camRelease(who){
+  cam.users.delete(who);
+  if(!cam.users.size&&cam.stream){cam.stream.getTracks().forEach(t=>t.stop()); cam.stream=null; cam.vid.srcObject=null;}
+}
+const camReady=()=>!!(cam.stream&&cam.vid.readyState>=2&&cam.vid.videoWidth);
+
+/* ---------- scene: aurora ---------- */
+const aurora={
+  init(){
+    const n=[3,5,8][S.dens]; this.r=[]; this.bumps=[];
+    const sg=()=>Math.random()<.5?-1:1;
+    for(let i=0;i<n;i++) this.r.push({y:.2+.6*i/(n-1)+rand(-.04,.04),a1:rand(.05,.1),k1:rand(1.6,3),w1:rand(.18,.32)*sg(),a2:rand(.015,.035),k2:rand(3.5,6),w2:rand(.3,.5)*sg(),th:[.17,.12,.08][S.dens]*rand(.85,1.25),k3:rand(1.5,3),w3:rand(.2,.4),p:rand(0,TAU),ci:i});
+    this.stars=[]; for(let i=0,ns=[6,10,16][S.dens];i<ns;i++) this.stars.push({x:Math.random(),y:Math.random(),s:rand(.6,1.2),p:rand(0,TAU),w:rand(.7,1.4)});
+    this.N=72; this.xs=new Float32Array(73); this.cy=new Float32Array(73); this.th=new Float32Array(73);
+  },
+  poke(x){this.bumps.push({x:x/W,t:0}); if(this.bumps.length>5) this.bumps.shift();},
+  update(dt){for(const b of this.bumps) b.t+=dt; this.bumps=this.bumps.filter(b=>b.t<8); for(const s of this.stars){s.x+=dt*.004*s.w; if(s.x>1.05) s.x-=1.1;}},
+  draw(t){
+    const p=P(); bgFill();
+    if(p.dark){ctx.fillStyle=fgMain(); for(const s of this.stars){const k=.7+.3*Math.sin(t*.9*s.w+s.p); ctx.globalAlpha=.5+.5*k; ctx.save(); ctx.translate(s.x*W,s.y*H); ctx.rotate(s.p); shapePath(1,M*.022*s.s*k); ctx.fill(); ctx.restore();} ctx.globalAlpha=1;}
+    ctx.globalCompositeOperation=p.dark?'lighter':'multiply';
+    const N=this.N, xs=this.xs, cy=this.cy, th=this.th;
+    for(const r of this.r){
+      for(let j=0;j<=N;j++){
+        const x=-.04*W+j/N*1.08*W, ux=x/M, xu=x/W;
+        let y=r.y*H+M*(r.a1*(1+.6*energy)*Math.sin(r.k1*ux+r.w1*t+r.p)+r.a2*Math.sin(r.k2*ux+r.w2*t+r.p*1.7));
+        for(const b of this.bumps){const env=Math.exp(-b.t/2.2)*Math.min(1,b.t*2), d1=xu-(b.x+b.t*.1), d2=xu-(b.x-b.t*.1); y-=M*.11*env*(Math.exp(-d1*d1/.008)+Math.exp(-d2*d2/.008));}
+        xs[j]=x; cy[j]=y; th[j]=M*r.th*(.6+.4*Math.sin(r.k3*ux-r.w3*t+r.p))*(1+.25*energy);
+      }
+      const c=col(r.ci);
+      if(p.c.length>1) ribbon(1.9,c,.2); // soft glow only in colour; pure black & white stays crisp
+      ribbon(1,c,1);
+      if(p.dark&&c!=='#ffffff') ribbon(.22,'#ffffff',.5);
+    }
+    ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
+    function ribbon(k,c,a){
+      ctx.globalAlpha=a; ctx.fillStyle=c; ctx.beginPath(); ctx.moveTo(xs[0],cy[0]-th[0]*k/2);
+      for(let j=1;j<=N;j++) ctx.lineTo(xs[j],cy[j]-th[j]*k/2);
+      for(let j=N;j>=0;j--) ctx.lineTo(xs[j],cy[j]+th[j]*k/2);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+};
+
+/* ---------- scene: bullseye ---------- */
+const bull={
+  init(){this.off=0; this.src=[];},
+  half(){return M*[.085,.055,.036][S.dens];},
+  poke(x,y){this.src.push({x,y,t:0}); if(this.src.length>4) this.src.shift();},
+  update(dt){
+    const h=this.half(); let v=M*.045*(1+1.2*energy);
+    v=Math.min(v,1.1*2*h/spd); // never more than ~1 ring per second past any point
+    this.off+=v*dt; for(const s of this.src) s.t+=dt; this.src=this.src.filter(s=>s.t<8);
+  },
+  draw(t){
+    const p=P(), h=this.half(); bgFill();
+    const cx=W/2+Math.sin(t*.13)*W*.12, cy=H/2+Math.sin(t*.17+1)*H*.1;
+    const maxR=Math.hypot(Math.max(cx,W-cx),Math.max(cy,H-cy))+h*2, n=Math.ceil(maxR/h)+1;
+    const ph=this.off%h, base=Math.floor(this.off/h);
+    for(let k=n;k>=0;k--){ctx.fillStyle=band(k-base); disc(cx,cy,k*h+ph);}
+    const bw=p.c.length===1;
+    for(const s of this.src){
+      const R=s.t*M*.14, a=clamp(1-s.t/8,0,1);
+      ctx.lineWidth=h;
+      if(bw){ctx.globalCompositeOperation='difference'; ctx.strokeStyle='#ffffff';} else ctx.strokeStyle=col(1);
+      ctx.globalAlpha=a;
+      for(let i=0;i<3;i++){const rr=R-i*h*2.5; if(rr<h/2) continue; ctx.beginPath(); ctx.arc(s.x,s.y,rr,0,TAU); ctx.stroke();}
+      ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
+    }
+  }
+};
+
+/* ---------- scene: shapes ---------- */
+function fillPattern(pat,r,c,c2){
+  ctx.fillStyle=c; ctx.fillRect(-r*1.4,-r*1.4,r*2.8,r*2.8);
+  ctx.fillStyle=c2;
+  if(pat===1){for(let k=3;k>=1;k--){ctx.fillStyle=k%2?c:c2; disc(0,0,k*r/3);}}
+  else if(pat===2){const w=r/2.6; for(let x=-r*1.4;x<r*1.4;x+=w*2) ctx.fillRect(x+w*.5,-r*1.4,w,r*2.8);}
+  else if(pat===3){const q=r/1.7; for(let i=-3;i<3;i++) for(let j=-3;j<3;j++) if((i+j)&1) ctx.fillRect(i*q,j*q,q,q);}
+  else if(pat===4){const g=r*.56; for(let j=-3;j<=3;j++) for(let i=-3;i<=3;i++) disc(i*g+((j&1)?g/2:0),j*g*.9,r*.15);}
+}
+const shapes={
+  make(x,y,extra){return {x,y,r:M*[.13,.1,.075][S.dens]*rand(.85,1.2),h:rand(0,TAU),sp:rand(.028,.045),type:Math.floor(rand(0,6)),pat:Math.floor(rand(0,5)),ci:Math.floor(rand(0,8)),c2:Math.random()<.5,rot:rand(0,TAU),vr:rand(-.25,.25),ph:rand(0,TAU),bo:0,bp:0,g:extra?0:1,life:extra?22:Infinity};},
+  init(){this.s=[]; for(let i=0,n=[5,9,15][S.dens];i<n;i++) this.s.push(this.make(rand(.15,.85)*W,rand(.15,.85)*H,false));},
+  poke(x,y,str,src){
+    if(src==='music'){const o=this.s[Math.floor(Math.random()*this.s.length)]; if(o){o.bo=Math.max(o.bo,.7); o.bp=0;} return;}
+    let hit=null; for(const o of this.s) if(Math.hypot(o.x-x,o.y-y)<o.r*1.15) hit=o;
+    if(hit){hit.bo=1; hit.vr+=(Math.random()<.5?-1:1)*1.1;}
+    else {this.s.push(this.make(x,y,true)); const ex=this.s.filter(o=>o.life!==Infinity); if(ex.length>6) ex[0].life=Math.min(ex[0].life,1.5);}
+    for(const o of this.s) if(o!==hit) o.bo=Math.max(o.bo,.3*str);
+  },
+  update(dt){
+    const s=this.s;
+    for(const o of s){
+      o.ph+=dt*.5; o.h+=Math.sin(o.ph*1.3)*dt*.35;
+      const m=o.r*1.05; let ax=0, ay=0;
+      if(o.x<m) ax=1; else if(o.x>W-m) ax=-1; if(o.y<m) ay=1; else if(o.y>H-m) ay=-1;
+      if(ax||ay){let d=Math.atan2(ay,ax)-o.h; d=Math.atan2(Math.sin(d),Math.cos(d)); o.h+=d*Math.min(1,dt*1.6);}
+      const v=M*o.sp*(1+.5*energy); o.x+=Math.cos(o.h)*v*dt; o.y+=Math.sin(o.h)*v*dt;
+      o.x=clamp(o.x,-o.r,W+o.r); o.y=clamp(o.y,-o.r,H+o.r);
+      o.rot+=o.vr*dt; const tv=(o.vr<0?-1:1)*.15; o.vr+=(tv-o.vr)*Math.min(1,dt*.5);
+      o.bo*=Math.exp(-dt*1.1); o.bp+=dt*6;
+      o.g=Math.min(1,o.g+dt*1.2); if(o.life!==Infinity) o.life-=dt;
+    }
+    for(let i=0;i<s.length;i++) for(let j=i+1;j<s.length;j++){
+      const a=s[i], b=s[j], dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1, mn=(a.r+b.r)*.95;
+      if(d<mn){const f=(mn-d)*Math.min(1,dt*1.5)/d/2; a.x-=dx*f; a.y-=dy*f; b.x+=dx*f; b.y+=dy*f;}
+    }
+    this.s=s.filter(o=>o.life>0);
+  },
+  draw(t){
+    const p=P(); bgFill();
+    for(const o of this.s){
+      const life=o.life<1.5?Math.max(0,o.life/1.5):1;
+      const sc=o.g*life*(1+.16*energy)*(1+.22*o.bo*Math.sin(o.bp)); if(sc<=.01) continue;
+      const c=col(o.ci), c2=(o.c2&&p.c.length>1)?col(o.ci+1):p.bg;
+      ctx.save(); ctx.translate(o.x,o.y+Math.sin(t*.8+o.ph)*o.r*.05); ctx.rotate(o.rot+.25*o.bo*Math.sin(o.bp*.7)); ctx.scale(sc,sc);
+      shapePath(o.type,o.r); ctx.save(); ctx.clip(); fillPattern(o.pat,o.r,c,c2); ctx.restore();
+      shapePath(o.type,o.r); ctx.lineJoin='round'; ctx.lineWidth=o.r*.07; ctx.strokeStyle=c; ctx.stroke();
+      ctx.restore();
+    }
+  }
+};
+
+/* ---------- scene: faces ---------- */
+const faces={
+  init(){this.f=[]; for(let i=0,n=[1,3,6][S.dens];i<n;i++) this.f.push({ph:rand(0,TAU),bt:0,nb:rand(1,3.5),lx:0,ly:0,tx:0,ty:0,nl:rand(.5,2),happy:0,tg:0,nt:rand(8,18)}); this.resize();},
+  resize(){
+    if(!this.f) return; const n=this.f.length, land=W>=H;
+    const cols=n===1?1:n===3?(land?3:1):(land?3:2), rows=Math.ceil(n/cols), cw=W/cols, ch=H/rows, r=Math.min(cw,ch)*.36;
+    this.f.forEach((f,i)=>{f.hx=(i%cols+.5)*cw; f.hy=(Math.floor(i/cols)+.5)*ch; f.r=r;});
+  },
+  poke(x,y,s,src){if(src==='music'){const f=this.f[Math.floor(Math.random()*this.f.length)]; if(f) f.happy=Math.max(f.happy,.75); return;} let best=null, bd=1e9; for(const f of this.f){const d=Math.hypot(f.hx-x,f.hy-y); if(d<bd){bd=d; best=f;} f.happy=Math.max(f.happy,.55); f.tx=clamp((x-f.hx)/(f.r*2.5),-1,1); f.ty=clamp((y-f.hy)/(f.r*2.5),-1,1); f.nl=2.5;} if(best) best.happy=1;},
+  update(dt){
+    const follow=performance.now()-ptr.moved<3000;
+    for(const f of this.f){
+      f.nb-=dt; if(f.nb<=0){f.bt=.3; f.nb=Math.random()<.2?.5:rand(2.5,6);} if(f.bt>0) f.bt=Math.max(0,f.bt-dt);
+      f.nl-=dt; if(f.nl<=0){f.tx=rand(-1,1); f.ty=rand(-.7,.7); f.nl=rand(1.5,4);}
+      if(follow){f.tx=clamp((ptr.x-f.hx)/(f.r*2.5),-1,1); f.ty=clamp((ptr.y-f.hy)/(f.r*2.5),-1,1);}
+      const k=1-Math.exp(-dt*5); f.lx+=(f.tx-f.lx)*k; f.ly+=(f.ty-f.ly)*k;
+      f.happy*=Math.exp(-dt/3.5);
+      f.nt-=dt; if(f.nt<=0){f.tg=2.2; f.nt=rand(14,28);} if(f.tg>0) f.tg=Math.max(0,f.tg-dt);
+    }
+  },
+  draw(t){
+    bgFill();
+    for(const f of this.f){
+      const x=f.hx+Math.sin(t*.31+f.ph)*f.r*.16, y=f.hy+Math.sin(t*.47+f.ph*1.3)*f.r*.08;
+      drawFace(x,y,f.r*(1+.06*energy+.05*f.happy),Math.sin(t*.4+f.ph)*.13,f,t);
+    }
+  }
+};
+function drawFace(x,y,r,tilt,f,t){
+  const p=P(), main=fgMain(), acc=fgAccent(), bg=p.bg;
+  ctx.save(); ctx.translate(x,y); ctx.rotate(tilt);
+  if(acc){ctx.strokeStyle=acc; ctx.lineWidth=r*.1; ctx.beginPath(); ctx.arc(0,0,r*1.1,0,TAU); ctx.stroke();}
+  ctx.fillStyle=main; disc(0,0,r);
+  if(acc){ctx.fillStyle=acc; disc(-r*.58,r*.2,r*.12); disc(r*.58,r*.2,r*.12);}
+  ctx.lineCap='round';
+  ctx.strokeStyle=bg; ctx.lineWidth=r*.055; ctx.beginPath(); ctx.arc(r*.06,-r*.8,r*.1,Math.PI*.9,Math.PI*2.4); ctx.stroke();
+  const hp=f.happy, b=f.bt>0?Math.sin(Math.PI*(1-f.bt/.3)):0, open=1-b;
+  const ex=r*.34, ey=-r*.1, gx=f.lx*r*.07, gy=f.ly*r*.05;
+  for(const s of [-1,1]){
+    const cx=s*ex+gx, cy=ey+gy;
+    if(open>.2){
+      ctx.fillStyle=bg; ctx.beginPath(); ctx.ellipse(cx,cy,r*.14*(1+.12*hp),r*.18*(1+.18*hp)*open,0,0,TAU); ctx.fill();
+      if(open>.55){ctx.fillStyle=main; disc(cx+r*.045,cy-r*.06*open,r*.045);}
+    } else {ctx.strokeStyle=bg; ctx.lineWidth=r*.06; ctx.beginPath(); ctx.arc(cx,cy-r*.04,r*.12,.15*Math.PI,.85*Math.PI); ctx.stroke();}
+    ctx.strokeStyle=bg; ctx.lineWidth=r*.06; ctx.beginPath(); ctx.arc(s*ex,ey-r*.1-r*.09*hp,r*.2,1.25*Math.PI,1.75*Math.PI); ctx.stroke();
+  }
+  const talk=energy>.04?(.5+.5*Math.sin(t*6.5))*energy*.45:0;
+  let o=clamp(.1+.8*hp+talk,0,1); if(f.tg>0) o=Math.max(o,.3);
+  const mt=r*.24;
+  if(o<.16){ctx.strokeStyle=bg; ctx.lineWidth=r*.075; ctx.beginPath(); ctx.arc(0,mt-r*.2,r*.34,.22*Math.PI,.78*Math.PI); ctx.stroke();}
+  else {
+    const mw=r*(.3+.08*o), d=r*(.12+.24*o);
+    ctx.fillStyle=bg; ctx.beginPath(); ctx.moveTo(-mw,mt); ctx.quadraticCurveTo(0,mt+r*.05,mw,mt); ctx.bezierCurveTo(mw*.95,mt+d*1.35,-mw*.95,mt+d*1.35,-mw,mt); ctx.closePath(); ctx.fill();
+    if(acc){ctx.save(); ctx.clip(); ctx.fillStyle=acc; ctx.beginPath(); ctx.ellipse(0,mt+d*1.05,mw*.5,d*.45,0,0,TAU); ctx.fill(); ctx.restore();}
+  }
+  if(f.tg>0){
+    const k=Math.sin(Math.PI*(1-f.tg/2.2)), tw=r*.13, ty0=mt+r*.08, ty1=mt+r*.2+r*.24*k;
+    ctx.fillStyle=acc||main; ctx.strokeStyle=bg; ctx.lineWidth=r*.035;
+    ctx.beginPath(); ctx.moveTo(-tw,ty0); ctx.lineTo(-tw,ty1-tw); ctx.arc(0,ty1-tw,tw,Math.PI,0,true); ctx.lineTo(tw,ty0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ---------- scene: waves ---------- */
+const waves={
+  init(){this.pulses=[]; this.drift=0;},
+  poke(x){this.pulses.push({x:x/W,t:0}); if(this.pulses.length>5) this.pulses.shift();},
+  update(dt){this.drift+=dt*.05*(1+energy); for(const q of this.pulses) q.t+=dt; this.pulses=this.pulses.filter(q=>q.t<8);},
+  draw(t){
+    const N=[5,8,13][S.dens], sp=H/N, A=sp*.44*(1+.1*energy), steps=64, k1=TAU/(W*.6), k2=TAU/(W*.27);
+    const base=Math.floor(this.drift), fr=this.drift-base;
+    ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+    ctx.fillStyle=band(-2-base); ctx.fillRect(0,0,W,H);
+    const disp=new Float32Array(steps+1);
+    for(let s=0;s<=steps;s++){const xu=s/steps; let d=0; for(const q of this.pulses){const env=Math.exp(-q.t/2.2)*Math.min(1,q.t*2), d1=xu-(q.x+q.t*.1), d2=xu-(q.x-q.t*.1); d+=M*.12*env*(Math.exp(-d1*d1/.008)+Math.exp(-d2*d2/.008));} disp[s]=d;}
+    for(let i=-1;i<=N+1;i++){
+      const j=i-base; ctx.fillStyle=band(j); ctx.beginPath();
+      for(let s=0;s<=steps;s++){const x=-10+s/steps*(W+20); const y=(i+fr)*sp+A*(.65*Math.sin(k1*x-.5*t+j*.32)+.35*Math.sin(k2*x+.35*t+j*.21))+disp[s]; s?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+      ctx.lineTo(W+10,H+M); ctx.lineTo(-10,H+M); ctx.closePath(); ctx.fill();
+    }
+  }
+};
+
+/* ---------- scene: pinwheel ---------- */
+const pin={
+  init(){this.a=0; this.v=.16;},
+  poke(x,y,s,src){this.v+=src==='music'?.35:.9;},
+  update(dt){
+    const nS=[6,10,16][S.dens], cap=1.3*TAU/nS/spd; // cap so a sector passes any point at most ~1.3 times a second
+    this.v+=(.16*(1+energy)-this.v)*(1-Math.exp(-dt*.6)); this.v=Math.min(this.v,cap); this.a+=this.v*dt;
+  },
+  draw(t){
+    const p=P(); bgFill();
+    const nS=[6,10,16][S.dens], nR=[3,5,7][S.dens], sa=TAU/nS;
+    const cx=W/2+Math.sin(t*.09)*W*.06, cy=H/2+Math.cos(t*.11)*H*.06, R=Math.hypot(W,H)*.62, tw=Math.sin(t*.12)*.5;
+    for(let k=nR-1;k>=0;k--){
+      const r0=R*Math.pow(k/nR,1.3), r1=R*Math.pow((k+1)/nR,1.3), off=this.a*(k%2?1:-.65)+k*tw;
+      ctx.fillStyle=col(k); ctx.beginPath();
+      for(let s=0;s<nS;s++){if((s+k)%2) continue; const a0=off+s*sa, a1=a0+sa; ctx.moveTo(cx+Math.cos(a0)*r0,cy+Math.sin(a0)*r0); ctx.arc(cx,cy,r1,a0,a1); ctx.arc(cx,cy,r0,a1,a0,true); ctx.closePath();}
+      ctx.fill();
+    }
+    const hr=R*Math.pow(1/nR,1.3)*.38;
+    ctx.fillStyle=col(0); disc(cx,cy,hr); ctx.fillStyle=p.bg; disc(cx,cy,hr*.62); ctx.fillStyle=col(1); disc(cx,cy,hr*.3);
+  }
+};
+
+/* ---------- scene: lava ---------- */
+const lava={
+  mk(x,y,extra){const a=rand(0,TAU), s=M*rand(.03,.05); return {x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:M*[.17,.13,.1][S.dens]*rand(.8,1.25),ci:Math.floor(rand(0,8)),g:extra?0:1,life:extra?20:Infinity,ph:rand(0,TAU)};},
+  init(){this.b=[]; for(let i=0,n=[4,7,11][S.dens];i<n;i++) this.b.push(this.mk(rand(.2,.8)*W,rand(.2,.8)*H,false)); if(!this.fc){this.fc=document.createElement('canvas'); this.fx=this.fc.getContext('2d');} this.resize();},
+  resize(){if(!this.fc) return; const fw=Math.max(80,Math.round(Math.min(280,W/3.5))), fh=Math.max(45,Math.round(fw*H/W)); this.fc.width=fw; this.fc.height=fh; this.img=this.fx.createImageData(fw,fh);},
+  poke(x,y,s,src){if(src==='music') return; this.b.push(this.mk(x,y,true)); const ex=this.b.filter(o=>o.life!==Infinity); if(ex.length>5) ex[0].life=Math.min(ex[0].life,2);},
+  update(dt){
+    for(const b of this.b){
+      const k=dt*(1+.6*energy); b.x+=b.vx*k; b.y+=b.vy*k;
+      if((b.x<b.r*.5&&b.vx<0)||(b.x>W-b.r*.5&&b.vx>0)) b.vx*=-1;
+      if((b.y<b.r*.5&&b.vy<0)||(b.y>H-b.r*.5&&b.vy>0)) b.vy*=-1;
+      b.g=Math.min(1,b.g+dt*.8); if(b.life!==Infinity) b.life-=dt;
+    }
+    this.b=this.b.filter(b=>b.life>0);
+  },
+  draw(t){
+    const p=P(), fw=this.fc.width, fh=this.fc.height, sx=W/fw, bgc=hex(p.bg), cols=p.c.map(hex), nc=cols.length;
+    const n=this.b.length, bx=new Float32Array(n), by=new Float32Array(n), rr=new Float32Array(n), ci=new Int32Array(n);
+    for(let k=0;k<n;k++){const b=this.b[k]; let g=b.g; if(b.life<2) g*=Math.max(0,b.life/2); const R=b.r/sx*g*(1+.08*Math.sin(t*.7+b.ph))*(1+.25*energy); bx[k]=b.x/sx; by[k]=b.y/sx; rr[k]=R*R; ci[k]=b.ci;}
+    const d=this.img.data; let o=0;
+    for(let y=0;y<fh;y++) for(let x=0;x<fw;x++){
+      let f=0, best=0, bi=0, gx=0, gy=0;
+      for(let k=0;k<n;k++){const dx=x-bx[k], dy=y-by[k], D=dx*dx+dy*dy+1, c=rr[k]/D, g=2*c/D; f+=c; gx-=g*dx; gy-=g*dy; if(c>best){best=c; bi=k;}}
+      const gm=Math.sqrt(gx*gx+gy*gy)+1e-6;
+      // three levels: outer body, inner ring, core; each edge anti-aliased over one field pixel
+      const m=cols[ci[bi]%nc], s2=nc>1?cols[(ci[bi]+1)%nc]:bgc;
+      const a1=clamp(.5+(f-1)/gm,0,1), a2=clamp(.5+(f-2.3)/gm,0,1), a3=clamp(.5+(f-4.2)/gm,0,1);
+      for(let q=0;q<3;q++){let v=bgc[q]; v+=(m[q]-v)*a1; v+=(s2[q]-v)*a2; v+=(m[q]-v)*a3; d[o+q]=v;}
+      d[o+3]=255; o+=4;
+    }
+    this.fx.putImageData(this.img,0,0);
+    ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over'; ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='low';
+    ctx.drawImage(this.fc,0,0,W,H);
+  }
+};
+
+/* ---------- scene: tracker ---------- */
+function ball(kind,r){
+  const p=P(), a=col(0), b2=p.c.length>1?col(1):p.bg;
+  ctx.save(); ctx.beginPath(); ctx.arc(0,0,r,0,TAU); ctx.clip();
+  if(kind===0){for(let s=0;s<6;s++){ctx.fillStyle=s%2?b2:a; ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,r*1.05,s*TAU/6,(s+1)*TAU/6); ctx.closePath(); ctx.fill();} ctx.fillStyle=a; disc(0,0,r*.22); ctx.fillStyle=p.bg; disc(0,0,r*.1);}
+  else if(kind===1){for(let k=4;k>=1;k--){ctx.fillStyle=k%2===0?a:b2; disc(0,0,k*r/4);} ctx.fillStyle=a; disc(r*.625,0,r*.1);}
+  else {const q=r/1.6; for(let i=-2;i<2;i++) for(let j=-2;j<2;j++){ctx.fillStyle=((i+j)&1)?a:b2; ctx.fillRect(i*q,j*q,q+.5,q+.5);}}
+  ctx.restore();
+  ctx.strokeStyle=a; ctx.lineWidth=r*.06; ctx.beginPath(); ctx.arc(0,0,r,0,TAU); ctx.stroke();
+}
+const track={
+  rad(){return M*[.15,.12,.1][S.dens];},
+  init(){this.b=[]; this.tt=0; for(let i=0,n=[1,2,3][S.dens];i<n;i++) this.b.push({x:W/2,y:H*(i+1)/(n+1),rot:0,jump:0,kind:i%3});},
+  poke(x,y){let best=null, bd=1e9; for(const b of this.b){const d=Math.hypot(b.x-x,b.y-y); if(d<bd){bd=d; best=b;}} if(best&&best.jump<=0) best.jump=1;},
+  update(dt){
+    this.tt+=dt; const n=this.b.length, w=TAU/14, r=this.rad();
+    this.b.forEach((b,i)=>{
+      let tx=W/2+(i%2?-1:1)*(W/2-r*1.1-M*.04)*Math.sin(w*this.tt+i*.9), ty=H*(i+1)/(n+1)+Math.sin(2*w*this.tt+i)*H*.05;
+      if(i===0&&ptr.down){tx=ptr.x; ty=ptr.y;}
+      const k=1-Math.exp(-dt*3), px=b.x; b.x+=(tx-b.x)*k; b.y+=(ty-b.y)*k; b.rot+=(b.x-px)/r;
+      if(b.jump>0) b.jump=Math.max(0,b.jump-dt/1.1);
+    });
+  },
+  draw(t){
+    bgFill(); const r=this.rad();
+    for(const b of this.b){
+      const j=b.jump>0?Math.sin(Math.PI*(1-b.jump)):0;
+      ctx.save(); ctx.translate(b.x,b.y-j*M*.16); ctx.rotate(b.rot); const sc=1+.12*energy; ctx.scale(sc,sc); ball(b.kind,r); ctx.restore();
+    }
+  }
+};
+
+
+/* ---------- scene: mirror (front camera, posterized into the palette) ---------- */
+const mirror={
+  init(){
+    this.pulse=0; this.rot=0; this.fresh=true; this.dummy={ph:0,bt:0,nb:2,lx:0,ly:0,happy:0,tg:0};
+    if(!this.pc){this.pc=document.createElement('canvas'); this.px=this.pc.getContext('2d',{willReadFrequently:true});}
+    this.resize();
+    camAcquire('mirror').then(ok=>{if(cur!==mirror){if(ok) camRelease('mirror'); return;} if(!ok) toast(mediaMsg(cam.err,'camera'));});
+  },
+  exit(){camRelease('mirror');},
+  resize(){if(!this.pc) return; const pw=Math.round(clamp(W/5,120,240)), ph=Math.max(60,Math.round(pw*H/W)); this.pc.width=pw; this.pc.height=ph; this.L=new Float32Array(pw*ph); this.img=this.px.createImageData(pw,ph); this.fresh=true;},
+  poke(){this.pulse=1; this.dummy.happy=1;},
+  update(dt){
+    this.rot+=dt*.22; this.pulse*=Math.exp(-dt*1.4);
+    const f=this.dummy; f.nb-=dt; if(f.nb<=0){f.bt=.3; f.nb=rand(2.5,5);} if(f.bt>0) f.bt=Math.max(0,f.bt-dt); f.happy*=Math.exp(-dt/3);
+  },
+  draw(t){
+    const p=P(); bgFill();
+    if(!camReady()){drawFace(W/2,H/2,M*.3,Math.sin(t*.4)*.1,this.dummy,t); this.frame(); return;}
+    const v=cam.vid, pw=this.pc.width, ph=this.pc.height, vw=v.videoWidth, vh=v.videoHeight, X=this.px;
+    const sa=pw/ph, va=vw/vh; let sw=vw, sh=vh, sx=0, sy=0;
+    if(va>sa){sw=vh*sa; sx=(vw-sw)/2;} else {sh=vw/sa; sy=(vh-sh)/2;}
+    X.setTransform(-1,0,0,1,pw,0); X.drawImage(v,sx,sy,sw,sh,0,0,pw,ph); X.setTransform(1,0,0,1,0,0);
+    const d=X.getImageData(0,0,pw,ph).data, L=this.L, n=pw*ph, hist=new Uint32Array(64), k=this.fresh?1:.35;
+    for(let i=0,j=0;i<n;i++,j+=4){const l=(d[j]*77+d[j+1]*150+d[j+2]*29)>>8; L[i]+=(l-L[i])*k; hist[clamp(L[i]>>2,0,63)]++;} // temporal smoothing stops sensor noise from flickering
+    this.fresh=false;
+    const pct=q=>{let c=0; const tg=q*n; for(let b=0;b<64;b++){c+=hist[b]; if(c>=tg) return b*4+2;} return 255;};
+    const acc=fgAccent(), two=!acc, t1=two?pct(.5):pct(.4), t2=two?1e9:pct(.74);
+    const main=hex(fgMain()), bgc=hex(p.bg), dark=p.dark?bgc:main, light=p.dark?main:bgc, mid=acc?hex(acc):light, o=this.img.data, w=7;
+    for(let i=0,j=0;i<n;i++,j+=4){
+      const l=L[i], a1=clamp((l-t1)/w+.5,0,1), a2=two?0:clamp((l-t2)/w+.5,0,1);
+      for(let q=0;q<3;q++){let c=dark[q]+(mid[q]-dark[q])*a1; c+=(light[q]-c)*a2; o[j+q]=c;}
+      o[j+3]=255;
+    }
+    X.putImageData(this.img,0,0);
+    ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='low'; ctx.drawImage(this.pc,0,0,W,H);
+    this.frame();
+  },
+  frame(){
+    const lw=M*(.035+.025*this.pulse+.02*energy), inset=lw/2+M*.02;
+    ctx.strokeStyle=col(0); ctx.lineWidth=lw; ctx.lineJoin='round'; ctx.beginPath(); roundedPoly([[inset,inset],[W-inset,inset],[W-inset,H-inset],[inset,H-inset]],M*.08); ctx.stroke();
+    ctx.fillStyle=fgAccent()||fgMain(); ctx.strokeStyle=P().bg; ctx.lineWidth=M*.006;
+    for(let i=0;i<8;i++){const a=this.rot+i*TAU/8, x=W/2+Math.cos(a)*(W/2-inset), y=H/2+Math.sin(a)*(H/2-inset); ctx.save(); ctx.translate(x,y); ctx.rotate(a*2); shapePath(1,M*(.035+.015*this.pulse)); ctx.fill(); ctx.stroke(); ctx.restore();}
+  }
+};
+
+const SCENES=[aurora,bull,shapes,faces,waves,pin,lava,track,mirror];
+let cur=SCENES[S.scene];
+
+/* ---------- layout ---------- */
+function resize(){
+  W=Math.max(1,innerWidth); H=Math.max(1,innerHeight); M=Math.min(W,H);
+  let dpr=Math.min(window.devicePixelRatio||1,2); dpr=Math.max(1,Math.min(dpr,Math.sqrt(4.2e6/(W*H)))); // pixel budget keeps big iPads smooth
+  cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); ctx.setTransform(dpr,0,0,dpr,0,0);
+  if(cur&&cur.resize) cur.resize();
+}
+addEventListener('resize',resize);
+addEventListener('orientationchange',()=>setTimeout(resize,300));
+if(window.visualViewport) visualViewport.addEventListener('resize',resize);
+
+/* ---------- transitions (always fade through black: no sudden full-screen changes) ---------- */
+let fade=0, fdir=0, pend=null, sinceChange=0;
+function transition(fn){pend=fn; fdir=1;}
+function setScene(i){i=((i%SCENES.length)+SCENES.length)%SCENES.length; if(i===S.scene&&!pend) return; mark('scene',i); sinceChange=0; transition(()=>{if(cur.exit) cur.exit(); S.scene=i; cur=SCENES[i]; cur.init(); save(); syncUI();});}
+function setPal(i){mark('pal',i); transition(()=>{S.pal=i; save(); syncUI();});}
+function setDens(v){mark('k:dens',v); transition(()=>{S.dens=v; if(cur.exit) cur.exit(); cur.init(); save(); syncUI();});}
+
+/* ---------- sound ---------- */
+const mus={freq:null,prev:null,peak:.06,floor:1,lv:0,fluxAvg:0,lastBeat:0,mic:null,micSrc:null};
+let AC=null, master=null, bus=null, chimeIn=null, mbIn=null, musicAn=null, mediaSrc=null, lastSound=-1e9;
+const PENTA=[0,2,4,7,9,12,14,16,19,21];
+function audio(){
+  if(AC) return AC;
+  try{
+    AC=new (window.AudioContext||window.webkitAudioContext)();
+    master=AC.createGain(); master.gain.value=S.vol*.7; master.connect(AC.destination);
+    bus=AC.createGain(); bus.connect(master);
+    const dl=AC.createDelay(1.5), fb=AC.createGain(), lp=AC.createBiquadFilter(), wet=AC.createGain();
+    dl.delayTime.value=.32; fb.gain.value=.3; lp.type='lowpass'; lp.frequency.value=1800; wet.gain.value=.45;
+    bus.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(wet); wet.connect(master);
+    chimeIn=AC.createGain(); chimeIn.connect(bus);
+    mbIn=AC.createGain(); mbIn.connect(bus);
+    musicAn=AC.createAnalyser(); musicAn.fftSize=1024; musicAn.smoothingTimeConstant=.55;
+    const sink=AC.createGain(); sink.gain.value=0; musicAn.connect(sink); sink.connect(AC.destination);
+    mbIn.connect(musicAn);
+    mus.freq=new Uint8Array(musicAn.frequencyBinCount); mus.prev=new Float32Array(musicAn.frequencyBinCount);
+  }catch(e){AC=null;}
+  return AC;
+}
+function wakeAudio(){const ac=audio(); if(ac&&ac.state!=='running'){try{ac.resume().catch(()=>{});}catch(e){}}}
+function tone(semi,v,dur,dest){
+  if(!AC||!dest) return;
+  try{
+    const t0=AC.currentTime, f=523.25*Math.pow(2,semi/12), g=AC.createGain(), o=AC.createOscillator(), o2=AC.createOscillator(), g2=AC.createGain();
+    g.gain.setValueAtTime(.0001,t0); g.gain.exponentialRampToValueAtTime(v,t0+.03); g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+    o.type='sine'; o.frequency.value=f; o2.type='sine'; o2.frequency.value=f*2; g2.gain.value=.22;
+    o.connect(g); o2.connect(g2); g2.connect(g); g.connect(dest);
+    o.start(t0); o2.start(t0); o.stop(t0+dur+.05); o2.stop(t0+dur+.05);
+    if(dest===chimeIn) lastSound=performance.now();
+  }catch(e){}
+}
+function chime(yf){if(!AC) return; const i=clamp(Math.round((1-yf)*6),0,6); tone(PENTA[i],.16,1.8,chimeIn); tone(PENTA[i]+7,.05,1.4,chimeIn);}
+let mbT=1, mbI=4;
+function lullabyTick(rdt){
+  if(S.music!==1||!AC||!running||paused||resting) return;
+  mbT-=rdt; if(mbT>0) return;
+  if(Math.random()<.15){mbT=rand(1.2,2.2); return;}
+  mbI=clamp(mbI+Math.round(rand(-2.4,2.4)),0,PENTA.length-1);
+  tone(PENTA[mbI]-12,.12,2.4,mbIn); if(Math.random()<.3) tone(PENTA[mbI]-24,.06,2.8,mbIn);
+  mbT=rand(.8,1.6)/Math.sqrt(spd);
+}
+
+/* ---------- my songs (played inside the app so the show can hear them) ---------- */
+const songEl=$('#song'), songs=[]; let songI=0, songGain=null, songWas=false;
+function hookSong(){if(mediaSrc||!audio()) return; try{mediaSrc=AC.createMediaElementSource(songEl); songGain=AC.createGain(); mediaSrc.connect(songGain); songGain.connect(master); mediaSrc.connect(musicAn);}catch(e){}}
+function songsSet(list,persist){
+  songEl.pause(); songs.forEach(s=>URL.revokeObjectURL(s.url)); songs.length=0;
+  for(const f of list) songs.push({name:String(f.name||'Song').replace(/\.[a-z0-9]+$/i,''),url:URL.createObjectURL(f.blob||f)});
+  songI=0; if(songs.length) songEl.src=songs[0].url;
+  renderSongs(); if(persist) idbSave(list);
+}
+function songPlay(){if(!songs.length) return; wakeAudio(); hookSong(); try{const pr=songEl.play(); if(pr&&pr.catch) pr.catch(()=>toast('Tap Play to start the music.'));}catch(e){}}
+function songNext(){if(!songs.length) return; songI=(songI+1)%songs.length; songEl.src=songs[songI].url; songPlay(); renderSongs();}
+songEl.addEventListener('ended',()=>songNext());
+songEl.addEventListener('play',()=>renderSongs()); songEl.addEventListener('pause',()=>renderSongs());
+function renderSongs(){
+  const n=songs.length, pl=$('#songPlay');
+  $('#songNow').textContent=n?`${songEl.paused?'Paused':'Playing'}: ${songs[songI].name} (${songI+1} of ${n}). Saved on this device.`:'Pick MP3 or M4A files from the Files app. They stay saved on this device for next time.';
+  pl.textContent=songEl.paused?'Play':'Pause'; pl.disabled=!n; $('#songNext').disabled=n<2;
+}
+$('#songIn').addEventListener('change',e=>{
+  const fs=[...e.target.files].filter(f=>/^audio\//.test(f.type)||/\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(f.name));
+  e.target.value=''; if(!fs.length){musNote('Those files weren’t audio. Pick MP3 or M4A songs.',true); return;}
+  songsSet(fs,true); if(S.music!==2) setMusic(2); else songPlay();
+});
+$('#songPlay').addEventListener('click',()=>{if(songEl.paused){if(S.music!==2) setMusic(2); else songPlay();} else songEl.pause();});
+$('#songNext').addEventListener('click',()=>songNext());
+const idb={open(){if(this.p) return this.p; this.p=new Promise(res=>{try{const r=indexedDB.open('jl-lightshow',1); r.onupgradeneeded=()=>r.result.createObjectStore('songs',{keyPath:'i'}); r.onsuccess=()=>res(r.result); r.onerror=()=>res(null); r.onblocked=()=>res(null);}catch(e){res(null);}}); return this.p;}};
+async function idbSave(list){
+  try{
+    const db=await idb.open(); if(!db) return; const recs=[]; let total=0;
+    for(let i=0;i<list.length&&i<25;i++){const f=list[i], b=f.blob||f; total+=b.size; if(total>250e6){musNote('These songs play now, but they’re too big to remember for next time.'); return;} recs.push({i,name:f.name,type:b.type,buf:await b.arrayBuffer()});}
+    await new Promise(res=>{const tx=db.transaction('songs','readwrite'), st=tx.objectStore('songs'); st.clear(); recs.forEach(r=>st.put(r)); tx.oncomplete=res; tx.onerror=res; tx.onabort=res;});
+  }catch(e){}
+}
+async function idbLoad(){try{const db=await idb.open(); if(!db) return []; return await new Promise(res=>{const q=db.transaction('songs').objectStore('songs').getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>res([]);});}catch(e){return [];}}
+
+/* ---------- music analysis: loudness swells the scene, note/beat onsets make gentle pokes ---------- */
+function musicAnalyse(rdt){
+  if(!musicAn||!S.music||!mus.freq){mus.lv*=.9; return;}
+  musicAn.getByteFrequencyData(mus.freq);
+  const binHz=AC.sampleRate/musicAn.fftSize, hi=Math.min(mus.freq.length,Math.round(5000/binHz)), nb=hi-1;
+  let sum=0, flux=0;
+  for(let i=1;i<hi;i++){const v=mus.freq[i]/255; sum+=v; const d=v-mus.prev[i]; if(d>0) flux+=d; mus.prev[i]=v;}
+  const avg=sum/nb; flux/=nb;
+  mus.peak=Math.max(avg,mus.peak*Math.exp(-rdt/8),.06);
+  mus.floor=avg<mus.floor?avg:mus.floor+(avg-mus.floor)*Math.min(1,rdt*.05);
+  const lv=clamp((avg-mus.floor*1.1)/Math.max(mus.peak-mus.floor,.08),0,1);
+  mus.lv+=(lv-mus.lv)*(1-Math.exp(-rdt/(lv>mus.lv?.08:.45)));
+  mus.fluxAvg+=(flux-mus.fluxAvg)*(1-Math.exp(-rdt/.5));
+  if(running&&!paused&&!resting){
+    const R=[.3,.55,.85][S.react];
+    energyT=Math.max(energyT,mus.lv*R);
+    const now=performance.now();
+    if(flux>mus.fluxAvg*1.7+.008&&lv>.15&&now-mus.lastBeat>620){mus.lastBeat=now; poke(W*rand(.25,.75),H*rand(.25,.75),.5+.5*R,'music');} // at most ~1.6 per second
+  }
+}
+async function startListen(){
+  try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw {name:'NoMedia'};
+    const st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    if(S.music!==3){st.getTracks().forEach(t=>t.stop()); return;}
+    audio(); mus.mic=st; mus.micSrc=AC.createMediaStreamSource(st); mus.micSrc.connect(musicAn);
+    musNote('Listening. Play music from a phone or speaker near the iPad and the show dances along.');
+  }catch(e){if(S.music===3){S.music=0; syncUI();} musNote(mediaMsg(e,'microphone'),true);}
+}
+function stopListen(){if(mus.micSrc){try{mus.micSrc.disconnect();}catch(e){}} mus.micSrc=null; if(mus.mic) mus.mic.getTracks().forEach(t=>t.stop()); mus.mic=null;}
+function musDefault(){musNote(S.music===1?'A soft music-box tune. The show pulses with each note.':'');}
+function setMusic(m){
+  const prev=S.music; S.music=m; musDefault();
+  if(prev===2&&m!==2) songEl.pause();
+  if(prev===3&&m!==3) stopListen();
+  if(m) wakeAudio();
+  if(m===1) mbT=.2;
+  if(m===2&&songs.length) songPlay();
+  if(m===3&&prev!==3){if(S.sensor===1) setSensor(0); startListen();}
+  mus.peak=.06; mus.floor=1; save(); syncUI();
+}
+
+/* ---------- responding: touches, keys, voice, movement ---------- */
+let lastPoke=0, heardN=0;
+function poke(x,y,s,src){
+  const now=performance.now(); if(resting||now-lastPoke<(src==='music'?150:280)) return; lastPoke=now;
+  energyT=Math.min(1.2,energyT+(src==='music'?.35:.65)*s);
+  if(cur.poke) cur.poke(x,y,s,src);
+  if(S.chimes&&src!=='music') chime(y/H);
+}
+const sen={stream:null,src:null,an:null,buf:null,cam:false,sc:null,sx:null,prev:null,level:0,floor:.003,over:0,last:0,acc:0,mlvl:0,hit:0};
+const SEN_DEFAULT='Tap the screen (or press Space) whenever he coos or smiles, and the show answers him.';
+async function setSensor(k){
+  stopSensor(); S.sensor=k; heardN=0; syncUI();
+  if(!k) return;
+  if(k===1){
+    if(S.music===3) setMusic(0);
+    try{
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw {name:'NoMedia'};
+      const st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:false,autoGainControl:false}});
+      if(S.sensor!==1){st.getTracks().forEach(t=>t.stop()); return;}
+      sen.stream=st; const ac=audio(); if(!ac) throw new Error('no audio'); wakeAudio();
+      const src=ac.createMediaStreamSource(st), bp=ac.createBiquadFilter(), an=ac.createAnalyser();
+      bp.type='bandpass'; bp.frequency.value=700; bp.Q.value=.6; an.fftSize=1024; src.connect(bp); bp.connect(an);
+      sen.src=src; sen.an=an; sen.buf=new Float32Array(an.fftSize); sen.floor=.003; sen.over=0;
+      senNote('Listening for coos. The bar jumps when he makes a sound; slide sensitivity until it catches him but not the room.'+(S.music?' Works best with music off.':''));
+    }catch(e){stopSensor(); S.sensor=0; syncUI(); senNote(mediaMsg(e,'microphone'),true);}
+  } else {
+    const ok=await camAcquire('motion');
+    if(S.sensor!==2){if(ok) camRelease('motion'); return;}
+    if(!ok){S.sensor=0; syncUI(); senNote(mediaMsg(cam.err,'camera'),true); return;}
+    sen.cam=true; sen.prev=null; if(!sen.sc){sen.sc=document.createElement('canvas'); sen.sc.width=64; sen.sc.height=48; sen.sx=sen.sc.getContext('2d',{willReadFrequently:true});}
+    $('#camWrap').hidden=false;
+    senNote('Watching for wiggles and kicks, like a crib mobile tied to his foot.');
+  }
+}
+function stopSensor(){
+  if(sen.stream) sen.stream.getTracks().forEach(t=>t.stop());
+  if(sen.src){try{sen.src.disconnect();}catch(e){}}
+  sen.stream=null; sen.src=null; sen.an=null; sen.prev=null; sen.level=0;
+  if(sen.cam){camRelease('motion'); sen.cam=false;}
+  $('#camWrap').hidden=true; senNote(SEN_DEFAULT);
+}
+function senNote(h,warn){const n=$('#senNote'); n.textContent=h; n.classList.toggle('warn',!!warn);}
+function musNote(h,warn){const n=$('#musNote'); n.textContent=h; n.classList.toggle('warn',!!warn);}
+function sensorTick(rdt){
+  const now=performance.now(); let lvl=0, trig=false, str=1;
+  if(sen.an){
+    sen.an.getFloatTimeDomainData(sen.buf); let s=0; for(let i=0;i<sen.buf.length;i++) s+=sen.buf[i]*sen.buf[i];
+    const rms=Math.sqrt(s/sen.buf.length), thr=sen.floor*(1.5+(1-S.sens)*4)+.0004+(1-S.sens)*.002;
+    sen.floor+=(rms-sen.floor)*Math.min(1,rdt*(rms<thr?.5:.02)); sen.floor=Math.max(.0008,sen.floor);
+    lvl=rms/thr; sen.over=rms>thr?sen.over+rdt:0;
+    if(sen.over>.08&&now-sen.last>1400&&now-lastSound>1300){trig=true; str=clamp(lvl*.7,.7,1.4);}
+  } else if(sen.cam&&camReady()){
+    sen.acc+=rdt;
+    if(sen.acc>=.1){
+      sen.acc=0; sen.sx.drawImage(cam.vid,0,0,64,48);
+      const d=sen.sx.getImageData(0,0,64,48).data, g=new Uint8Array(64*48);
+      for(let i=0,j=0;i<g.length;i++,j+=4) g[i]=(d[j]*77+d[j+1]*150+d[j+2]*29)>>8;
+      if(sen.prev){
+        let c=0; for(let i=0;i<g.length;i++) if(Math.abs(g[i]-sen.prev[i])>24) c++;
+        const fr=c/g.length, thr=.012+(1-S.sens)*.1; sen.mlvl=fr/thr;
+        if(fr>thr&&fr<.6&&now-sen.last>1400){trig=true; str=clamp(fr/thr*.6,.7,1.4);}
+      }
+      sen.prev=g;
+    }
+    lvl=sen.mlvl;
+  } else {sen.level*=.9; return;}
+  sen.level+=(Math.min(1.5,lvl)-sen.level)*.3;
+  if(trig&&running){sen.last=now; sen.hit=now; heardN++; poke(W*rand(.3,.7),H*rand(.3,.7),str,'sensor');}
+}
+
+/* ---------- touch blooms: every finger gets light exactly where it lands ---------- */
+const blooms=[];
+function addBloom(x,y){blooms.push({x,y,t:0,c:Math.floor(rand(0,8)),a:rand(0,TAU)}); if(blooms.length>16) blooms.shift();}
+function drawBlooms(rdt){
+  if(!blooms.length) return;
+  ctx.globalCompositeOperation='source-over';
+  for(let i=blooms.length-1;i>=0;i--){
+    const b=blooms[i]; b.t+=rdt; if(b.t>=1.5){blooms.splice(i,1); continue;}
+    const u=b.t/1.5, e=1-Math.pow(1-u,3), R=M*(.03+.16*e), lw=M*.032*(1-u*.5);
+    ctx.globalAlpha=1-u;
+    ctx.strokeStyle=P().bg; ctx.lineWidth=lw+M*.014; ctx.beginPath(); ctx.arc(b.x,b.y,R,0,TAU); ctx.stroke();
+    ctx.strokeStyle=col(b.c); ctx.lineWidth=lw; ctx.stroke();
+    ctx.fillStyle=col(b.c+1); ctx.strokeStyle=P().bg; ctx.lineWidth=M*.005;
+    for(let k=0;k<6;k++){const an=b.a+k*TAU/6+u*.9, rr=R*1.35; ctx.save(); ctx.translate(b.x+Math.cos(an)*rr,b.y+Math.sin(an)*rr); ctx.rotate(an); shapePath(1,M*.024*(1-u*.6)); ctx.fill(); ctx.stroke(); ctx.restore();}
+  }
+  ctx.globalAlpha=1;
+}
+
+/* ---------- session timer ---------- */
+let elapsed=0, restDim=1;
+function startRest(){resting=true; songWas=!songEl.paused; songEl.pause(); $('#restMsg').textContent=`${S.session} minutes of watching. Little eyes tire fast, so try again after a cuddle.`; $('#rest').classList.add('show'); closePanel();}
+function endRest(){resting=false; elapsed=0; $('#rest').classList.remove('show'); if(songWas&&S.music===2) songPlay(); songWas=false;}
+const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+function togglePause(){paused=!paused; if(paused){songWas=!songEl.paused; songEl.pause();} else if(songWas&&S.music===2){songPlay(); songWas=false;} syncUI();}
+
+/* ---------- main loop ---------- */
+const panel=$('#panel'), prevCtx=$('#camPrev').getContext('2d');
+let last=performance.now(), uiT=0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const rdt=Math.min(.05,Math.max(0,(now-last)/1000)); last=now;
+  spd=[.55,1,1.6][S.speed]*(resting?.35:1);
+  const dt=paused?0:rdt*spd; T+=dt;
+  energyT*=Math.exp(-rdt/2.2); energy+=(Math.min(1,energyT)-energy)*(1-Math.exp(-rdt/.35));
+  if(running&&!paused&&!resting){
+    elapsed+=rdt; if(S.session&&elapsed>=S.session*60) startRest();
+    if(S.auto){sinceChange+=rdt; if(sinceChange>=S.auto&&!pend) setScene(S.scene>=7?0:S.scene+1);}
+  }
+  if(fdir===1){fade=Math.min(1,fade+rdt/.55); if(fade>=1){const f=pend; pend=null; if(f) f(); fdir=-1;}}
+  else if(fdir===-1){fade=Math.max(0,fade-rdt/.75); if(fade<=0) fdir=0;}
+  restDim+=((resting?.14:1)-restDim)*(1-Math.exp(-rdt/2.5));
+  try{cur.update(dt); ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over'; cur.draw(T); drawBlooms(rdt);}catch(e){console.error(e);}
+  const fe=fade*fade*(3-2*fade), vis=(1-fe)*S.bright*restDim;
+  if(vis<.999){ctx.globalAlpha=1-vis; ctx.globalCompositeOperation='source-over'; ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;}
+  sensorTick(rdt); lullabyTick(rdt); musicAnalyse(rdt);
+  if(panel.classList.contains('open')){
+    const m=$('#meter'); m.firstElementChild.style.width=Math.min(100,sen.level*66)+'%'; m.classList.toggle('hit',now-sen.hit<500);
+    $('#musMeter').firstElementChild.style.width=Math.round(mus.lv*100)+'%';
+    if(sen.cam&&camReady()){prevCtx.setTransform(-1,0,0,1,128,0); prevCtx.drawImage(cam.vid,0,0,128,96); prevCtx.setTransform(1,0,0,1,0,0);}
+    uiT+=rdt; if(uiT>.4){uiT=0; $('#elapsed').textContent=fmt(elapsed)+(S.session?` of ${S.session}:00`:''); $('#senCount').textContent=(sen.an||sen.cam)?`answered ${heardN}×`:'';}
+  }
+}
+
+/* ---------- controls ---------- */
+const canBuzz=typeof navigator.vibrate==='function';
+const isIOS=/iP(ad|hone|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const standalone=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
+const SEGS={dens:['Few','Some','Lots'],speed:['Slowest','Slow','Lively'],music:['Off','Lullaby','My songs','Listen'],react:['Gentle','Medium','Big'],sensor:['Tap only','Voice','Movement'],chimes:[[0,'Off'],[1,'On']],buzz:[[0,'Off'],[1,'On']],auto:[[0,'Off'],[45,'45 s'],[120,'2 min']],session:[[3,'3 min'],[5,'5 min'],[10,'10 min'],[0,'No limit']]};
+$('#scenes').innerHTML=SCN.map((s,i)=>`<button class="opt" data-scene="${i}">${s[0]}<small>${s[1]}</small></button>`).join('');
+$('#pals').innerHTML=PALS.map((p,i)=>`<button class="opt" data-pal="${i}">${p.name}<span class="sw">${[p.bg,...p.c].map(c=>`<i style="background:${c}"></i>`).join('')}</span></button>`).join('');
+for(const k in SEGS) $('#'+k).innerHTML=SEGS[k].map((o,i)=>Array.isArray(o)?`<button class="opt" data-k="${k}" data-v="${o[0]}">${o[1]}</button>`:`<button class="opt" data-k="${k}" data-v="${i}">${o}</button>`).join('');
+function mark(group,v){
+  const sel=group==='scene'?'[data-scene]':group==='pal'?'[data-pal]':`[data-k="${group.slice(2)}"]`;
+  document.querySelectorAll(sel).forEach(b=>b.classList.toggle('on',+(b.dataset.scene??b.dataset.pal??b.dataset.v)===v));
+}
+function syncUI(){
+  mark('scene',S.scene); mark('pal',S.pal); for(const k in SEGS) mark('k:'+k,S[k]);
+  $('#bright').value=Math.round(S.bright*100); $('#vol').value=Math.round(S.vol*100); $('#sens').value=Math.round(S.sens*100);
+  $('#senBox').hidden=!S.sensor; $('#songBox').hidden=S.music!==2; $('#musBox').hidden=!S.music;
+  $('#buzzSec').hidden=!canBuzz; $('#noBuzz').hidden=canBuzz;
+  $('#pauseBtn').textContent=paused?'Resume':'Pause'; renderSongs();
+}
+function setOpt(k,v){
+  if(k==='dens'){if(v!==S.dens) setDens(v); return;}
+  if(k==='sensor'){setSensor(v); return;}
+  if(k==='music'){if(v!==S.music) setMusic(v); return;}
+  S[k]=v;
+  if(k==='chimes'&&v){wakeAudio(); setTimeout(()=>chime(.5),60);}
+  if(k==='buzz'&&v&&canBuzz){try{navigator.vibrate(18);}catch(e){}}
+  if(k==='auto') sinceChange=0;
+  if(k==='session'&&resting) endRest();
+  save(); syncUI();
+}
+panel.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.scene!=null) setScene(+b.dataset.scene);
+  else if(b.dataset.pal!=null) setPal(+b.dataset.pal);
+  else if(b.dataset.k) setOpt(b.dataset.k,+b.dataset.v);
+});
+$('#bright').addEventListener('input',e=>{S.bright=clamp(e.target.value/100,.25,1); save();});
+$('#vol').addEventListener('input',e=>{S.vol=clamp(e.target.value/100,0,1); if(master) master.gain.setTargetAtTime(S.vol*.7,AC.currentTime,.05); save();});
+$('#sens').addEventListener('input',e=>{S.sens=clamp(e.target.value/100,0,1); save();});
+$('#resetT').addEventListener('click',e=>{e.preventDefault(); elapsed=0; if(resting) endRest();});
+$('#fsBtn').addEventListener('click',()=>toggleFS(false));
+$('#pauseBtn').addEventListener('click',togglePause);
+$('#close').addEventListener('click',()=>closePanel());
+let panelGuard=0;
+function openPanel(fromHold){panel.classList.add('open'); if(fromHold) panelGuard=performance.now()+650; syncUI();}
+// the finger that held the corner button lifts over the panel: swallow that ghost click so it can't hit Close
+panel.addEventListener('click',e=>{if(performance.now()<panelGuard){e.stopPropagation(); e.preventDefault();}},true);
+function closePanel(){panel.classList.remove('open');}
+
+/* hold-to-open: a parent's press-and-hold opens the controls, a baby's swat doesn't */
+const gear=$('#gear'); let holdT=0;
+gear.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  if(e.pointerType==='mouse'){openPanel(); return;}
+  gear.classList.add('holding'); clearTimeout(holdT);
+  holdT=setTimeout(()=>{gear.classList.remove('holding'); openPanel(true);},700);
+});
+const cancelHold=e=>{clearTimeout(holdT); gear.classList.remove('holding'); if(e&&e.pointerType!=='mouse'&&panel.classList.contains('open')) panelGuard=Math.max(panelGuard,performance.now()+450);};
+['pointerup','pointercancel','pointerleave'].forEach(ev=>gear.addEventListener(ev,cancelHold));
+gear.addEventListener('click',e=>{if(e.detail===0) openPanel();});
+
+let toastT=0;
+function toast(msg){const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),4500);}
+
+let fsTipShown=false;
+function fsTip(force){
+  if(fsTipShown&&!force) return; fsTipShown=true;
+  toast(isIOS?(inFrame()?'Full screen is blocked inside the Claude app. Open the app’s own web address in Safari for full screen.':'Tip: in Safari, Share › Add to Home Screen opens it full screen every time.'):'Full screen is blocked here. Use your browser’s full-screen key: F11 on Windows, Ctrl+Cmd+F on a Mac.');
+}
+function toggleFS(auto){
+  const d=document, el=d.documentElement;
+  try{
+    if(d.fullscreenElement||d.webkitFullscreenElement){(d.exitFullscreen||d.webkitExitFullscreen).call(d); return;}
+    const req=el.requestFullscreen||el.webkitRequestFullscreen;
+    if(!req){fsTip(!auto); return;}
+    const pr=req.call(el); if(pr&&pr.catch) pr.catch(()=>fsTip(!auto));
+  }catch(e){fsTip(!auto);}
+}
+
+let wl=null;
+async function lockWake(){try{if('wakeLock' in navigator) wl=await navigator.wakeLock.request('screen');}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&running) lockWake();});
+
+let idleT=0;
+function wake(){document.body.classList.add('active'); document.body.classList.remove('idle'); clearTimeout(idleT); idleT=setTimeout(()=>{document.body.classList.remove('active'); if(running) document.body.classList.add('idle');},2600);}
+
+function start(){
+  if(running) return; running=true; elapsed=0;
+  $('#start').classList.add('gone');
+  wakeAudio();
+  if(!standalone&&!(document.fullscreenElement||document.webkitFullscreenElement)) toggleFS(true);
+  lockWake();
+  if(S.music===2&&songs.length) songPlay();
+  if(S.music===1) mbT=.5;
+}
+$('#go').addEventListener('click',start);
+$('#more').addEventListener('click',()=>endRest());
+
+cv.addEventListener('pointerdown',e=>{
+  if(panel.classList.contains('open')){closePanel(); return;}
+  if(!running) return;
+  ptr.down=true; ptr.x=e.clientX; ptr.y=e.clientY; ptr.moved=performance.now();
+  try{cv.setPointerCapture(e.pointerId);}catch(err){}
+  addBloom(e.clientX,e.clientY);
+  if(S.buzz&&canBuzz&&e.pointerType!=='mouse'){try{navigator.vibrate(18);}catch(err){}}
+  poke(e.clientX,e.clientY,1,'tap');
+  if(e.pointerType==='mouse') wake();
+});
+addEventListener('pointermove',e=>{ptr.x=e.clientX; ptr.y=e.clientY; if(e.pointerType==='mouse'||ptr.down) ptr.moved=performance.now(); if(e.pointerType==='mouse') wake();});
+const up=()=>{ptr.down=false;};
+addEventListener('pointerup',up); addEventListener('pointercancel',up);
+
+/* iPad: no pinch-zoom, double-tap zoom, rubber-band scrolling or long-press menus outside the panel */
+document.addEventListener('gesturestart',e=>e.preventDefault(),{passive:false});
+document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
+document.addEventListener('touchmove',e=>{const t=e.target; if(!(t.closest&&t.closest('#panel,#start'))) e.preventDefault();},{passive:false});
+document.addEventListener('contextmenu',e=>{const t=e.target; if(!(t.closest&&t.closest('#panel'))) e.preventDefault();});
+
+addEventListener('keydown',e=>{
+  const tag=e.target&&e.target.tagName;
+  if(tag==='INPUT'||e.metaKey||e.ctrlKey||e.altKey) return;
+  const k=e.key, n=SCENES.length;
+  if(k===' '||k==='Enter'){
+    if(tag==='BUTTON'||tag==='A'||tag==='LABEL') return;
+    e.preventDefault();
+    if(!running){start(); return;}
+    if(resting){endRest(); return;}
+    const x=W*rand(.35,.65), y=H*rand(.35,.65); addBloom(x,y); poke(x,y,1,'key');
+  }
+  else if(k>='1'&&k<='9'){setScene(+k-1); toast(SCN[+k-1][0]);}
+  else if(k==='ArrowRight'){const i=(S.scene+1)%n; setScene(i); toast(SCN[i][0]);}
+  else if(k==='ArrowLeft'){const i=(S.scene+n-1)%n; setScene(i); toast(SCN[i][0]);}
+  else if(k==='c'||k==='C'){const i=(S.pal+1)%PALS.length; setPal(i); toast(PALS[i].name);}
+  else if(k==='d'||k==='D'){const v=(S.dens+1)%3; setOpt('dens',v); toast(SEGS.dens[v]);}
+  else if(k==='s'||k==='S'){setOpt('speed',(S.speed+1)%3); toast(SEGS.speed[S.speed]);}
+  else if(k==='m'||k==='M'){if(!songs.length){toast('Pick songs first: controls › Music › My songs');} else if(songEl.paused){if(S.music!==2) setMusic(2); else songPlay();} else songEl.pause();}
+  else if(k==='p'||k==='P'){togglePause(); toast(paused?'Paused':'Playing');}
+  else if(k==='f'||k==='F') toggleFS(false);
+  else if(k==='h'||k==='H') panel.classList.contains('open')?closePanel():openPanel();
+  else if(k==='Escape') closePanel();
+  else return;
+  wake();
+});
+
+resize(); cur.init(); syncUI(); senNote(SEN_DEFAULT); musDefault(); requestAnimationFrame(frame);
+idbLoad().then(rs=>{if(rs.length&&!songs.length) songsSet(rs.sort((a,b)=>a.i-b.i).map(r=>({name:r.name,blob:new Blob([r.buf],{type:r.type||'audio/mpeg'})})),false);});
+})();
+</script>
+</body>
+</html>
