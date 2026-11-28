@@ -964,15 +964,27 @@ function fsTip(force){
   if(fsTipShown&&!force) return; fsTipShown=true;
   toast(isIOS?(inFrame()?'Full screen is blocked inside the Claude app. Open the app’s own web address in Safari for full screen.':'Tip: in Safari, Share › Add to Home Screen opens it full screen every time.'):'Full screen is blocked here. Use your browser’s full-screen key: F11 on Windows, Ctrl+Cmd+F on a Mac.');
 }
+const isFS=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
 function toggleFS(auto){
   const d=document, el=d.documentElement;
   try{
-    if(d.fullscreenElement||d.webkitFullscreenElement){(d.exitFullscreen||d.webkitExitFullscreen).call(d); return;}
+    if(isFS()){if(!auto) fsUserExit=true; (d.exitFullscreen||d.webkitExitFullscreen).call(d); return;}
+    if(!auto) fsUserExit=false;
     const req=el.requestFullscreen||el.webkitRequestFullscreen;
     if(!req){fsTip(!auto); return;}
     const pr=req.call(el); if(pr&&pr.catch) pr.catch(()=>fsTip(!auto));
   }catch(e){fsTip(!auto);}
 }
+
+/* Safari lets a swipe leave full screen and no page can block that. If the show was full screen and a
+   swipe knocks it out, his next touch puts it straight back. Leaving with the Full screen button or F sticks. */
+let fsOn=false, fsUserExit=false, fsBack=false, fsTry=0;
+function onFSChange(){
+  if(isFS()){fsOn=true; fsBack=false;}
+  else if(fsOn){fsOn=false; fsBack=running&&!fsUserExit; fsUserExit=false;}
+}
+document.addEventListener('fullscreenchange',onFSChange); document.addEventListener('webkitfullscreenchange',onFSChange);
+cv.addEventListener('touchend',()=>{const now=performance.now(); if(fsBack&&running&&!isFS()&&now-fsTry>800){fsTry=now; toggleFS(true);}},{passive:true});
 
 let wl=null;
 async function lockWake(){try{if('wakeLock' in navigator) wl=await navigator.wakeLock.request('screen');}catch(e){}}
